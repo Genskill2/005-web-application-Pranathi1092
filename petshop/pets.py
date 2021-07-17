@@ -18,8 +18,19 @@ def format_date(d):
 
 @bp.route("/search/<field>/<value>")
 def search(field, value):
-    # TBD
-    return ""
+    conn = db.get_db()
+    cursor = conn.cursor()
+    oby = request.args.get("order_by", "id") 
+    order = request.args.get("order", "asc")
+    cursor.execute("select tag.id from tag where tag.name = ?",[value])
+    tag_no = cursor.fetchall()[0][0]
+    print(tag_no, " ", type(tag_no))
+    if order == "asc":
+        cursor.execute("select pet.id, pet.name, pet.bought, pet.sold, s.name from pet , animal s where pet.species = s.id and pet.id in (select tags_pets.pet from tags_pets where tags_pets.tag = ?) order by pet.id",[tag_no])
+    else:
+        cursor.execute("select pet.id, pet.name, pet.bought, pet.sold, s.name from pet , animal s where pet.species = s.id and pet.id in (select tags_pets.pet from tags_pets where tags_pets.tag = ?) order by pet.id desc",[tag_no])
+    pets = cursor.fetchall()
+    return render_template('index.html', pets = pets, order="desc" if order=="asc" else "asc")
 
 @bp.route("/")
 def dashboard():
@@ -74,6 +85,19 @@ def edit(pid):
     elif request.method == "POST":
         description = request.form.get('description')
         sold = request.form.get("sold")
+        cursor.execute("update pet set description = ? where pet.id = ?",[description, pid])
+        print(sold)
+        if(sold):
+            d1 = datetime.datetime.now()
+            curr_date = d1.strftime('%Y-%m-%d')
+            print(curr_date)
+            print(type(curr_date))
+            cursor.execute("update pet set sold = ? where pet.id = ?",[curr_date, pid])
+
+        cursor.close()
+        conn.commit()
+        db.close_db()
+
         # TODO Handle sold
         return redirect(url_for("pets.pet_info", pid=pid), 302)
         
